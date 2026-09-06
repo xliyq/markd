@@ -7,6 +7,16 @@ import InputDialog from "./components/InputDialog.vue";
 import type { DocNode } from "@editor/shared";
 import { parseOutline, countStats } from "@editor/plugins-app";
 import { getFindReplace, runToolbarAction, setTextPrompt, setLinkPrompt, setImagePrompt } from "@editor/plugins-editor";
+import TitleBar from "./components/TitleBar.vue";
+import StatusBar from "./components/StatusBar.vue";
+import EditorToolbar from "./components/EditorToolbar.vue";
+import SettingsCenter from "./components/SettingsCenter.vue";
+import LinkDialog from "./components/LinkDialog.vue";
+import ImageDialog from "./components/ImageDialog.vue";
+import FindPanel from "./components/FindPanel.vue";
+import SearchPanel from "./components/SearchPanel.vue";
+import OutlinePanel from "./components/OutlinePanel.vue";
+import WelcomeOverlay from "./components/WelcomeOverlay.vue";
 import type { OutlineItem, DocStats } from "@editor/plugins-app";
 import {
   NConfigProvider,
@@ -78,10 +88,10 @@ function onPromptCancel() {
 const linkDialog = ref<{ title: string; textLabel: string; urlLabel: string; confirmText: string } | null>(null);
 const linkForm = ref({ text: "", url: "" });
 const linkResolve = ref<((v: { text: string; href: string } | null) => void) | null>(null);
-function onLinkConfirm() {
+function onLinkConfirm(payload: { text: string; url: string }) {
   const r = linkResolve.value;
   linkDialog.value = null;
-  r?.({ text: linkForm.value.text, href: linkForm.value.url });
+  r?.({ text: payload.text, href: payload.url });
 }
 function onLinkCancel() {
   const r = linkResolve.value;
@@ -93,10 +103,7 @@ function onLinkCancel() {
 const imageDialog = ref<{ title: string; confirmText: string } | null>(null);
 const imageForm = ref({ src: "" });
 const imageResolve = ref<((v: { src: string } | null) => void) | null>(null);
-const imageFileInput = ref<HTMLInputElement>();
-async function onImageFilePicked() {
-  const input = imageFileInput.value;
-  const file = input?.files?.[0];
+async function onImageFilePicked(file: File) {
   if (!file) return;
   const imgMgr = boot.value?.api.imageManager as
     | { saveImageFile?: (docId: string, f: File) => Promise<string> }
@@ -382,7 +389,6 @@ const settingsTabs = [
   { label: "💾 数据", key: "data" },
 ];
 /** 恢复备份的文件选择器 */
-const restoreInput = ref<HTMLInputElement>();
 /** 侧边栏收起/展开（替代原 聚焦/无干扰 三态模式） */
 const sidebarCollapsed = ref(false);
 /** 查找/替换面板 */
@@ -536,22 +542,18 @@ async function onBackup() {
 }
 
 /** M7.2 数据恢复：导入备份 JSON */
-async function onRestore() {
+async function onRestoreFile(file: File) {
   const b = boot.value?.api.backup as { importBackup: (json: string) => Promise<{ docs: number }> } | undefined;
-  if (!b) return;
-  const input = restoreInput.value;
-  const file = input?.files?.[0];
-  if (!file) return;
+  if (!b || !file) return;
   try {
     statusText.value = "恢复中…";
-    const json = await file.text();
-    const stat = await b.importBackup(json);
-    statusText.value = `已恢复 ${stat.docs} 篇文档（刷新后生效）`;
-    await treeRef.value?.refresh();
+    file.text().then(async (json) => {
+      const stat = await b.importBackup(json);
+      statusText.value = `已恢复 ${stat.docs} 篇文档（刷新后生效）`;
+      await treeRef.value?.refresh();
+    });
   } catch (e) {
     statusText.value = `恢复失败: ${e instanceof Error ? e.message : String(e)}`;
-  } finally {
-    if (input) input.value = "";
   }
 }
 
@@ -943,24 +945,23 @@ onBeforeUnmount(() => {
     :theme-overrides="naiveOverrides"
   >
   <div class="app-shell">
-      <header class="titlebar" role="banner">
-        <span class="app-name">Milkdown 编辑器</span>
-        <span class="doc-title" aria-hidden="true">{{ docTitle }}</span>
-        <span class="spacer"></span>
-        <button class="toolbar-btn" @click="fileInput?.click()">导入 .md</button>
-        <n-dropdown :options="exportOptions" @select="onExportSelect">
-          <button class="toolbar-btn" title="导出">⬇ 导出 ▾</button>
-        </n-dropdown>
-        <button class="toolbar-btn" title="切换主题" @click="toggleTheme">{{ themeLabel }}</button>
-        <button class="toolbar-btn" title="设置" @click="onOpenSettings">⚙</button>
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".md,.markdown,text/markdown"
-          style="display: none"
-          @change="onImport"
-        />
-      </header>
+      <TitleBar
+        :doc-name="docName"
+        :theme-label="themeLabel"
+        :export-options="exportOptions"
+        @import="fileInput?.click()"
+        @export="onExportSelect"
+        @toggle-theme="toggleTheme"
+        @open-settings="onOpenSettings"
+      />
+      <!-- 隐藏文件输入（导入 .md；TitleBar/Welcome 的 @import 触发） -->
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".md,.markdown,text/markdown"
+        style="display: none"
+        @change="onImport"
+      />
 
       <div v-if="conflictMsg" class="conflict-banner" role="alert">{{ conflictMsg }}</div>
 
@@ -969,169 +970,60 @@ onBeforeUnmount(() => {
         <div v-if="copyToast" class="copy-toast" role="status">已复制到剪贴板</div>
       </Transition>
 
-      <!-- 查找/替换面板（Naive UI 控件） -->
-      <div v-if="findOpen" class="find-panel" role="dialog" aria-label="查找与替换" @keydown.esc="closeFind">
-        <div class="find-row">
-          <n-input
-            :value="findQuery"
-            size="small"
-           
-            placeholder="查找…"
-            aria-label="查找内容"
-            style="flex:1"
-            @update:value="onFindQueryInput"
-            @keydown.enter="onFindNext"
-          />
-          <span class="find-count" aria-live="polite">{{ findTotal > 0 ? `${findCurrent}/${findTotal}` : "0" }}</span>
-        </div>
-        <div class="find-row">
-          <n-input
-            v-model:value="findReplacement"
-            size="small"
-           
-            placeholder="替换为…"
-            :aria-label="'替换为'"
-            style="width:100%"
-            @keydown.enter="onReplaceOne"
-          />
-        </div>
-        <div class="find-row">
-          <n-button size="small" @click="onFindPrev">上一处</n-button>
-          <n-button size="small" @click="onFindNext">下一处</n-button>
-          <n-button size="small" @click="onReplaceOne">替换</n-button>
-          <n-button size="small" type="primary" @click="onReplaceAll">全部</n-button>
-        </div>
-      </div>
+      <!-- 查找/替换面板 -->
+      <FindPanel
+        :open="findOpen"
+        :query="findQuery"
+        :replacement="findReplacement"
+        :total="findTotal"
+        :current="findCurrent"
+        @close="closeFind"
+        @query="onFindQueryInput"
+        @next="onFindNext"
+        @prev="onFindPrev"
+        @replace="onReplaceOne"
+        @replace-all="onReplaceAll"
+      />
 
-      <!-- 全文搜索面板（ADR-016 / Phase 5，Naive UI 控件） -->
-      <div v-if="searchOpen" class="search-panel" role="dialog" aria-label="全文搜索" @keydown.esc="closeSearch">
-        <div class="find-row">
-          <n-input
-            :value="searchQuery"
-            size="small"
-           
-            placeholder="搜索全部文档…（Ctrl+Shift+F）"
-            :aria-label="'搜索全部文档'"
-            clearable
-            style="flex:1"
-            @update:value="onSearchQueryInput"
-            @keydown.enter="searchResults[0] && openSearchResult(searchResults[0].id)"
-          />
-          <span class="find-count" aria-live="polite">{{ searchTotal }}</span>
-        </div>
-        <div v-if="searchResults.length === 0 && searchQuery.trim()" class="search-empty">无结果</div>
-        <div v-else class="search-list">
-          <button
-            v-for="r in searchResults"
-            :key="r.id"
-            class="search-item"
-            @click="openSearchResult(r.id)"
-          >
-            <span class="search-name">{{ r.name }}</span>
-            <span class="search-snippet">{{ r.snippet }}</span>
-          </button>
-        </div>
-      </div>
+      <!-- 全文搜索面板 -->
+      <SearchPanel
+        :open="searchOpen"
+        :query="searchQuery"
+        :total="searchTotal"
+        :results="searchResults"
+        @close="closeSearch"
+        @query="onSearchQueryInput"
+        @open="openSearchResult"
+      />
 
-      <!-- 设置面板（设置中心：左侧页签 + 右侧内容，限高防超屏） -->
-      <n-modal
-        v-model:show="showSettings"
-        preset="card"
-        :style="{ width: '740px', maxWidth: '95vw' }"
-        title="设置"
-        :mask-closable="true"
-        aria-label="设置"
-      >
-        <div class="settings-shell">
-          <n-menu
-            class="settings-nav"
-            :value="settingsTab"
-            :options="settingsTabs"
-            :root-indent="6"
-            @update:value="(k) => (settingsTab = k as string)"
-          />
-          <div class="settings-body">
-            <section v-show="settingsTab === 'general'" class="settings-section">
-              <div class="settings-title">主题 · 外观</div>
-              <n-radio-group :value="themeMode" size="small" @update:value="onThemeModeChange">
-                <n-radio-button value="light">☀️ 亮色</n-radio-button>
-                <n-radio-button value="dark">🌙 暗色</n-radio-button>
-                <n-radio-button value="system">🌓 跟随系统</n-radio-button>
-              </n-radio-group>
-            </section>
+      <!-- 设置中心 -->
+      <SettingsCenter
+        :show="showSettings"
+        :settings-tab="settingsTab"
+        :settings-tabs="settingsTabs"
+        :theme-mode="themeMode"
+        :editor-prefs="editorPrefs"
+        :font-options="fontOptions"
+        :width-options="widthOptions"
+        :plugin-switches="pluginSwitches"
+        @update:show="(v: boolean) => (showSettings = v)"
+        @update:settings-tab="(k: string) => (settingsTab = k)"
+        @theme-mode-change="onThemeModeChange"
+        @font-size="setFontSize"
+        @max-width="setMaxWidth"
+        @toggle-plugin="togglePlugin"
+        @backup="onBackup"
+        @restore="onRestoreFile"
+      />
 
-            <section v-show="settingsTab === 'editor'" class="settings-section">
-              <div class="settings-title">编辑区</div>
-              <div class="settings-row">
-                <span class="settings-label">字体大小</span>
-                <n-select
-                  :value="editorPrefs.fontSize"
-                  :options="fontOptions"
-                  size="small"
-                  style="width: 150px"
-                  @update:value="setFontSize"
-                />
-              </div>
-              <div class="settings-row">
-                <span class="settings-label">编辑区宽度</span>
-                <n-select
-                  :value="editorPrefs.maxWidth"
-                  :options="widthOptions"
-                  size="small"
-                  style="width: 200px"
-                  @update:value="setMaxWidth"
-                />
-              </div>
-            </section>
-
-            <section v-show="settingsTab === 'plugins'" class="settings-section">
-              <div class="settings-title">插件 <span class="settings-hint">（停用立即生效）</span></div>
-              <div class="plugin-list">
-                <div v-for="p in pluginSwitches" :key="p.id" class="plugin-row">
-                  <span class="plugin-name">{{ p.name }}</span>
-                  <code class="plugin-id">{{ p.id }}</code>
-                  <n-switch
-                    size="small"
-                    :value="p.enabled"
-                    :aria-label="`启用插件：${p.name}`"
-                    @update:value="togglePlugin(p.id)"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section v-show="settingsTab === 'data'" class="settings-section">
-              <div class="settings-title">数据备份</div>
-              <div class="settings-desc">导出全部文档与设置（JSON），或从备份文件恢复。恢复会覆盖当前数据。</div>
-              <div class="settings-actions">
-                <n-button size="small" @click="onBackup">⬇ 导出备份</n-button>
-                <n-button size="small" @click="restoreInput?.click()">⬆ 导入恢复</n-button>
-                <input ref="restoreInput" type="file" accept=".json,application/json" style="display: none" @change="onRestore" />
-              </div>
-            </section>
-          </div>
-        </div>
-      </n-modal>
-
-      <!-- 首启欢迎引导（M1.12）→ Naive UI -->
-      <n-modal
-        v-model:show="showWelcome"
-        preset="card"
-        title="👋 欢迎使用 Milkdown 编辑器"
-        :mask-closable="false"
-        :closable="false"
-        :style="{ width: '440px', maxWidth: '92vw' }"
-      >
-        <div class="welcome-desc">本地优先的 WYSIWYG Markdown 写作工具。数据只存于你的浏览器，离线可用。</div>
-        <template #footer>
-          <div class="welcome-actions">
-            <n-button type="primary" @click="welcomeCreateDoc">＋ 新建文档</n-button>
-            <n-button @click="fileInput?.click()">📥 导入 .md</n-button>
-            <n-button @click="welcomeQuickNote">⚡ 快速记录</n-button>
-            <n-button text @click="dismissWelcome">跳过，直接开始 →</n-button>
-          </div>
-        </template>
-      </n-modal>
+      <!-- 首启欢迎 -->
+      <WelcomeOverlay
+        :show="showWelcome"
+        @create="welcomeCreateDoc"
+        @import="fileInput?.click()"
+        @quick-note="welcomeQuickNote"
+        @skip="dismissWelcome"
+      />
 
     <!-- 空库提示（文档全部删除后） -->
     <div v-if="showEmptyHint" class="empty-hint" role="status">
@@ -1152,58 +1044,30 @@ onBeforeUnmount(() => {
       @cancel="createDocDialog = false"
     />
 
-    <!-- 插入链接：双输入（显示文案 + 链接地址） -->
-    <n-modal
-      :show="!!linkDialog"
-      preset="card"
-      :title="linkDialog?.title || ''"
-      :style="{ width: '440px', maxWidth: '92vw' }"
-      @update:show="(v: boolean) => { if (!v) onLinkCancel() }"
-    >
-      <div class="link-dialog">
-        <div class="settings-row">
-          <span class="settings-label">{{ linkDialog?.textLabel }}</span>
-          <n-input v-model:value="linkForm.text" size="small" placeholder="显示在编辑器中的文案" style="width: 250px" @keydown.enter="onLinkConfirm" />
-        </div>
-        <div class="settings-row">
-          <span class="settings-label">{{ linkDialog?.urlLabel }}</span>
-          <n-input v-model:value="linkForm.url" size="small" placeholder="https://…" style="width: 250px" @keydown.enter="onLinkConfirm" />
-        </div>
-      </div>
-      <template #footer>
-        <div class="link-dialog-actions">
-          <n-button size="small" @click="onLinkCancel">取消</n-button>
-          <n-button size="small" type="primary" @click="onLinkConfirm">{{ linkDialog?.confirmText || '确定' }}</n-button>
-        </div>
-      </template>
-    </n-modal>
+    <!-- 插入链接 -->
+      <LinkDialog
+        :show="!!linkDialog"
+        :title="linkDialog?.title || '插入链接'"
+        :text-label="linkDialog?.textLabel || '显示文案'"
+        :url-label="linkDialog?.urlLabel || '链接地址'"
+        :confirm-text="linkDialog?.confirmText || '确定'"
+        :initial-text="linkForm.text"
+        :initial-url="linkForm.url"
+        @update:show="(v: boolean) => { if (!v) onLinkCancel() }"
+        @confirm="onLinkConfirm"
+      />
 
-    <!-- 插入图片：URL 直链 或 本地文件上传 -->
-    <n-modal
-      :show="!!imageDialog"
-      preset="card"
-      :title="imageDialog?.title || '插入图片'"
-      :style="{ width: '440px', maxWidth: '92vw' }"
-      @update:show="(v: boolean) => { if (!v) onImageCancel() }"
-    >
-      <div class="link-dialog">
-        <div class="settings-row">
-          <span class="settings-label">图片地址</span>
-          <n-input v-model:value="imageForm.src" size="small" placeholder="https://… 或上传后自动填入" style="width: 250px" @keydown.enter="onImageConfirm" />
-        </div>
-        <div class="settings-row">
-          <span class="settings-label">本地上传</span>
-          <n-button size="small" @click="imageFileInput?.click()">📁 选择文件…</n-button>
-          <input ref="imageFileInput" type="file" accept="image/*" style="display: none" @change="onImageFilePicked" />
-        </div>
-      </div>
-      <template #footer>
-        <div class="link-dialog-actions">
-          <n-button size="small" @click="onImageCancel">取消</n-button>
-          <n-button size="small" type="primary" @click="onImageConfirm">{{ imageDialog?.confirmText || '插入' }}</n-button>
-        </div>
-      </template>
-    </n-modal>
+    <!-- 插入图片 -->
+      <ImageDialog
+        :show="!!imageDialog"
+        :title="imageDialog?.title || '插入图片'"
+        :confirm-text="imageDialog?.confirmText || '插入'"
+        :src="imageForm.src"
+        @update:show="(v: boolean) => { if (!v) onImageCancel() }"
+        @update:src="(v: string) => (imageForm.src = v)"
+        @upload="onImageFilePicked"
+        @confirm="onImageConfirm"
+      />
 
     <!-- 通用文本输入（链接/图片 URL；替代 window.prompt） -->
     <InputDialog
@@ -1264,55 +1128,13 @@ onBeforeUnmount(() => {
           </template>
 
           <!-- 大纲页签（P1.4） -->
-          <div v-else class="outline-panel">
-            <div v-if="outline.length === 0" class="sidebar-empty">无标题</div>
-            <div v-else class="outline-list">
-              <button
-                v-for="item in outline"
-                :key="item.line"
-                class="outline-item"
-                :style="{ paddingLeft: (item.level - 1) * 14 + 8 + 'px' }"
-                :title="item.text"
-                @click="boot?.editor?.scrollToHeading(item.text)"
-              >
-                {{ item.text }}
-              </button>
-            </div>
-          </div>
+          <OutlinePanel v-else :items="outline" @jump="(text: string) => boot?.editor?.scrollToHeading(text)" />
         </aside>
 
         <!-- 主编辑区 -->
         <main class="main" :class="{ 'source-mode': sourceMode }" role="main" aria-label="编辑区">
           <!-- 顶部编辑工具栏（替代依赖 slash/tooltip 才发现功能） -->
-          <div class="editor-toolbar" role="toolbar" aria-label="编辑工具栏">
-            <div class="toolbar-group">
-              <n-button size="small" title="一级标题" @mousedown.capture.prevent @click="onToolbar('heading1')">H1</n-button>
-              <n-button size="small" title="二级标题" @mousedown.capture.prevent @click="onToolbar('heading2')">H2</n-button>
-              <n-button size="small" title="三级标题" @mousedown.capture.prevent @click="onToolbar('heading3')">H3</n-button>
-              <n-button size="small" title="正文" @mousedown.capture.prevent @click="onToolbar('paragraph')">¶</n-button>
-            </div>
-            <span class="toolbar-sep" aria-hidden="true"></span>
-            <div class="toolbar-group">
-              <n-button size="small" title="加粗 (Ctrl+B)" @mousedown.capture.prevent @click="onToolbar('bold')"><b>B</b></n-button>
-              <n-button size="small" title="斜体 (Ctrl+I)" @mousedown.capture.prevent @click="onToolbar('italic')"><i>I</i></n-button>
-              <n-button size="small" title="行内代码" @mousedown.capture.prevent @click="onToolbar('code')">`</n-button>
-              <n-button size="small" title="插入链接" @mousedown.capture.prevent @click="onToolbar('link')">🔗</n-button>
-              <n-button size="small" title="插入图片" @mousedown.capture.prevent @click="onToolbar('image')">🖼</n-button>
-            </div>
-            <span class="toolbar-sep" aria-hidden="true"></span>
-            <div class="toolbar-group">
-              <n-button size="small" title="引用" @mousedown.capture.prevent @click="onToolbar('blockquote')">❝</n-button>
-              <n-button size="small" title="代码块" @mousedown.capture.prevent @click="onToolbar('codeblock')">{}</n-button>
-              <n-button size="small" title="分割线" @mousedown.capture.prevent @click="onToolbar('hr')">―</n-button>
-              <n-button size="small" title="无序列表" @mousedown.capture.prevent @click="onToolbar('bulletList')">•≡</n-button>
-              <n-button size="small" title="有序列表" @mousedown.capture.prevent @click="onToolbar('orderedList')">1≡</n-button>
-              <n-button size="small" title="插入表格" @mousedown.capture.prevent @click="onToolbar('table')">⊞</n-button>
-            </div>
-            <span class="toolbar-sep" aria-hidden="true"></span>
-            <div class="toolbar-group">
-              <n-button size="small" :type="sourceMode ? 'primary' : 'default'" ghost :title="sourceMode ? '返回可视化编辑' : '源码编辑'" @click="toggleSourceMode">{{ sourceMode ? "📝 可视化" : "</> 源码" }}</n-button>
-            </div>
-          </div>
+          <EditorToolbar :source-mode="sourceMode" @toolbar="onToolbar" @toggle-source="toggleSourceMode" />
           <div ref="editorRoot" v-show="!sourceMode" class="editor-root" @click="onEditorClick"></div>
           <textarea
             v-show="sourceMode"
@@ -1325,12 +1147,7 @@ onBeforeUnmount(() => {
         </main>
       </div>
 
-      <footer class="statusbar" role="status" aria-live="polite">
-        <span>{{ statusText }}</span>
-        <span class="spacer"></span>
-        <span>{{ statsText }}</span>
-        <span>Markdown · 本地优先</span>
-      </footer>
+      <StatusBar :status-text="statusText" :doc-stats-text="statsText" :source-mode="sourceMode" />
     </div>
       <!-- 图片预览大图（点击编辑器内图片触发） -->
       <div
