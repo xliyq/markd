@@ -154,6 +154,38 @@ function onDocChanged(markdown: string) {
 /** 最近一次编辑器 Markdown（重建编辑器/切换插件即时生效用） */
 const lastMarkdown = ref("");
 
+/** 源码编辑模式（WYSIWYG ↔ Markdown 源码切换） */
+const sourceMode = ref(false);
+const sourceText = ref("");
+/** 切换源码/可视化模式 */
+function toggleSourceMode() {
+  if (!boot.value) return;
+  const inst = boot.value.editor;
+  if (!sourceMode.value) {
+    // 进入源码：取当前编辑器 Markdown 原文
+    sourceText.value = inst?.getMarkdown() ?? lastMarkdown.value;
+    sourceMode.value = true;
+    statusText.value = "源码编辑模式（切回可视化后自动应用并保存）";
+  } else {
+    // 退出源码：整体替换文档内容（parser 解析 → dispatch → 触发 onChange → 自动保存）
+    inst?.replaceMarkdown(sourceText.value);
+    sourceMode.value = false;
+    lastMarkdown.value = sourceText.value;
+    onDocChanged(sourceText.value);
+    focusEditor();
+    statusText.value = "已应用源码并返回可视化编辑";
+  }
+}
+/** 切换文档/重建前先把未应用的源码写回编辑器（避免丢改动） */
+function flushSourceBeforeSwitch() {
+  if (sourceMode.value && boot.value?.editor) {
+    const md = sourceText.value;
+    boot.value.editor.replaceMarkdown(md);
+    lastMarkdown.value = md;
+    sourceMode.value = false;
+  }
+}
+
 /** 字体档位（语义化）→ 基准字号(px) 映射；'medium' 默认对齐 crepe 16px */
 type FontSize = "small" | "medium" | "large" | "xlarge";
 const FONT_SIZE_MAP: Record<FontSize, number> = { small: 14, medium: 16, large: 18, xlarge: 20 };
@@ -525,6 +557,7 @@ async function onRestore() {
 
 async function openDoc(docId: string) {
   if (!boot.value) return;
+  flushSourceBeforeSwitch();
   activeDocId.value = docId;
   activeId.value = docId;
   // 查节点名（UUID 不可展示）
@@ -1249,7 +1282,7 @@ onBeforeUnmount(() => {
         </aside>
 
         <!-- 主编辑区 -->
-        <main class="main" role="main" aria-label="编辑区">
+        <main class="main" :class="{ 'source-mode': sourceMode }" role="main" aria-label="编辑区">
           <!-- 顶部编辑工具栏（替代依赖 slash/tooltip 才发现功能） -->
           <div class="editor-toolbar" role="toolbar" aria-label="编辑工具栏">
             <div class="toolbar-group">
@@ -1275,8 +1308,20 @@ onBeforeUnmount(() => {
               <n-button size="small" title="有序列表" @mousedown.capture.prevent @click="onToolbar('orderedList')">1≡</n-button>
               <n-button size="small" title="插入表格" @mousedown.capture.prevent @click="onToolbar('table')">⊞</n-button>
             </div>
+            <span class="toolbar-sep" aria-hidden="true"></span>
+            <div class="toolbar-group">
+              <n-button size="small" :type="sourceMode ? 'primary' : 'default'" ghost :title="sourceMode ? '返回可视化编辑' : '源码编辑'" @click="toggleSourceMode">{{ sourceMode ? "📝 可视化" : "</> 源码" }}</n-button>
+            </div>
           </div>
-          <div ref="editorRoot" class="editor-root" @click="onEditorClick"></div>
+          <div ref="editorRoot" v-show="!sourceMode" class="editor-root" @click="onEditorClick"></div>
+          <textarea
+            v-show="sourceMode"
+            v-model="sourceText"
+            class="source-editor"
+            spellcheck="false"
+            aria-label="Markdown 源码编辑"
+            placeholder="# 在此编辑 Markdown 源码…"
+          ></textarea>
         </main>
       </div>
 
@@ -1379,6 +1424,24 @@ onBeforeUnmount(() => {
 .sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .sidebar-empty { padding: 10px 12px; font-size: 12px; color: var(--text-muted); }
 .main { flex: 1; overflow-y: auto; background: var(--bg); }
+.main.source-mode { display: flex; flex-direction: column; }
+.source-editor {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 16px 24px 40px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  tab-size: 2;
+  box-sizing: border-box;
+}
+.source-editor:focus { box-shadow: inset 0 0 0 1px var(--border-soft); }
 .editor-root { max-width: min(var(--editor-max-width, 860px), 100%); font-size: var(--editor-font-size, 15px); margin: 0 auto; padding: 24px 32px 120px; padding-left: var(--editor-pad-left, 32px); min-height: 100%; display: flex; flex-direction: column; }
 
 /* ── 顶部编辑工具栏 ── */

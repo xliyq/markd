@@ -9,7 +9,7 @@
  * 注：正式装配走 createEditor + PluginManager；
  *     createMinimalEditor 是 Phase 0 spike 的回归入口（内联默认插件集）。
  */
-import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from '@milkdown/kit/core'
+import { Editor, rootCtx, defaultValueCtx, editorViewCtx, parserCtx } from '@milkdown/kit/core'
 import { commonmark } from '@milkdown/kit/preset/commonmark'
 import { gfm } from '@milkdown/kit/preset/gfm'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
@@ -22,10 +22,23 @@ import type { MilkdownPlugin, Ctx } from '@milkdown/ctx'
 export interface EditorInstance {
   /** 当前 Markdown 原文 */
   getMarkdown: () => string
+  /** 用 Markdown 原文整体替换文档内容（源码编辑回写；parser 解析后替换整篇，触发 onChange） */
+  replaceMarkdown: (markdown: string) => void
   /** 滚动到指定文本的标题节点（大纲跳转；找到返回 true） */
   scrollToHeading: (text: string) => boolean
   /** 卸载并销毁（Milkdown destroy 返回 Promise<Editor>，对外吞掉） */
   destroy: () => Promise<void>
+}
+
+/** 公共：editor.action 内用 parser 整体替换文档（replaceMarkdown 实现体） */
+function applyReplaceMarkdown(editor: import('@milkdown/kit/core').Editor, markdown: string): void {
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const parser = ctx.get(parserCtx) as (md: string) => { content: unknown; type?: { name?: string } }
+    const node = parser(markdown)
+    const frag = (node as { content: unknown }).content
+    view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, frag as never))
+  })
 }
 
 /**
@@ -127,6 +140,10 @@ export async function createEditor(
 
   return {
     getMarkdown: () => latestMarkdown,
+    replaceMarkdown: (markdown: string) => {
+      latestMarkdown = markdown
+      applyReplaceMarkdown(editor, markdown)
+    },
     scrollToHeading,
     destroy: () => editor.destroy().then(() => undefined),
   }
@@ -184,6 +201,10 @@ export async function createMinimalEditor(
 
   return {
     getMarkdown: () => latestMarkdown,
+    replaceMarkdown: (markdown: string) => {
+      latestMarkdown = markdown
+      applyReplaceMarkdown(editor, markdown)
+    },
     scrollToHeading,
     destroy: () => editor.destroy().then(() => undefined),
   }

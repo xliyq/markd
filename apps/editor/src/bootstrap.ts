@@ -214,7 +214,10 @@ export async function bootstrapApp(): Promise<AppBootstrap> {
     pm,
     api,
     dataSafety,
-    editor,
+    // getter：editor 闭包变量在 mountEditor 后更新，对象属性不能是创建时快照（否则永远 null）
+    get editor() {
+      return editor
+    },
     mountEditor,
     unmountEditor,
     openDocument,
