@@ -482,3 +482,12 @@ Playwright 探针验证：n-modal=1、3 radio、25 switch(全 active)、切暗�
 - ⚠️ 坑：① milkdown schema 包装器（imageBlockSchema.type 等）要 Ctx 不是 EditorSchema——插入构造一律 schema.nodes['image-block']（节点 key 带连字符！）直接建；② 插入模式 + 弹窗交互：onDocMouseDown 会把点击 n-modal 当"菜单外点击"清掉 insertModeAt → 图片弹窗期间菜单必须保留（closest('.n-modal') 豁免）；
 - 插入模式 shouldShow 不撤旗（插入不依赖光标位置）；
 - 验证：点 + 块数不变(noImmediateInsert)、菜单 14 项含图片、选标题2/图片/分割线均正确插入；typecheck + 7 e2e + 167 单测全绿。
+
+**2026-09-06 WYSIWYG ↔ Markdown 源码编辑切换（ADR-022）**：
+- 编辑工具栏「</> 源码 / 📝 可视化」切换；进入取 getMarkdown() 原文，退出 replaceMarkdown(parser 解析整体替换)；
+- 切回触发 onChange 自动保存；openDoc 前 flushSourceBeforeSwitch 防丢改动；源码区等宽 Textarea(flex 撑满 main.source-mode)。
+- ⚠️ 坑：bootstrap `return { editor }` 是**创建时快照**——mountEditor 后闭包变量更新但对象属性永远 null
+  （源码切换静默无效：getMarkdown 走 latestMarkdown 闭包所以进源码正常，replaceMarkdown 走 boot.editor 是 null）。
+  修复：返回对象改 getter `get editor() { return editor }`。判断「字段 vs getter」：闭包变量后续重新赋值时必须 getter。
+- EditorInstance 新增 replaceMarkdown（parserCtx 解析 → replaceWith(0, doc.content.size, node.content)）。
+- 验证：取原文/编辑/切回渲染(引用/标题/列表)/刷新持久化全通；线上 https://xliyq.github.io/markd/ 实测通过。

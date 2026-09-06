@@ -181,6 +181,19 @@
 
 ---
 
+## Phase 5 进展（2026-09-06 上线 + 导出增强 + 源码切换）
+
+**正式上线**：GitHub Pages 部署完成（https://xliyq.github.io/markd/，main 分支 CI 自动构建部署）；
+分支 master→main 对齐 workflow；生产构建真机冒烟（首启/建文档/渲染/表格/图片/持久化全过）。
+
+**导出增强（ADR-021 续）**：导出菜单启用 PDF（iframe + window.print 另存）与 Word（Word HTML .doc）；
+exportHtml 本地图片内联 base64（inlineAssetRefs，单独 HTML/PDF/Word 不破图）。图片压缩按用户指示暂缓。
+
+**Markdown 源码编辑切换（ADR-022）**：工具栏「</> 源码」双模式；replaceMarkdown 整体替换触发自动保存；
+切换文档前 flush 防丢改动；修 bootstrap editor 字段快照坑（改 getter）。
+
+**质量**：169 单测 + 7 e2e + typecheck + build 全绿；线上实测源码切换通过。
+
 ## Phase 5 进展（2026-09-05 应用壳 Naive UI + 渲染层统一批改）
 
 **Naive UI 应用壳迁移**（ADR-021）：设置中心（n-menu 左页签：通用/编辑区/插件/数据，72vh 高度封顶，主题桥接 n-config-provider + CSS 变量 naiveOverrides）、InputDialog/welcome 弹窗、查找替换面板、文档树（n-tree + render-prefix/suffix）、工具栏按钮；e2e 全套改 naive 选择器。
