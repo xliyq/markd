@@ -63,6 +63,30 @@ export async function buildDocZip(
   return zip
 }
 
+/**
+ * 把 HTML 里的本地资产引用（src="assets/xxx"）内联为 data URL（纯函数，可单测）。
+ * remote 资产或未收集到的 relPath 原样保留。
+ */
+export function inlineAssetRefs(
+  html: string,
+  dataUrls: Record<string, string>,
+): string {
+  return html.replace(/src="(assets\/[^"]+)"/g, (m, rel: string) => {
+    const dv = dataUrls[rel]
+    return dv ? `src="${dv}"` : m
+  })
+}
+
+/** Blob → data URL（浏览器 FileReader） */
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => resolve(String(fr.result))
+    fr.onerror = () => reject(fr.error ?? new Error('blobToDataUrl 读取失败'))
+    fr.readAsDataURL(blob)
+  })
+}
+
 export function createExportModule(api: AppApi): ExportModule {
   async function exportDoc(docId: string, options?: ExportOptions): Promise<number> {
     const zip = await buildDocZip(api.storage, docId, options)
@@ -102,6 +126,15 @@ export function createExportModule(api: AppApi): ExportModule {
       .use(rehypeStringify)
       .process(doc.content)
 
+    // 本地资产内联 base64（否则独立 HTML/PDF/Word 里 assets/xxx 相对路径破图）
+    const assets = (await api.storage?.listAssets(docId)) ?? []
+    const dataUrls: Record<string, string> = {}
+    for (const a of assets) {
+      if (a.tier === 'remote' || !a.blob) continue
+      dataUrls[a.relPath] = await blobToDataUrl(a.blob)
+    }
+    const htmlBody = inlineAssetRefs(String(html), dataUrls)
+
     // 独立完整 HTML（自带样式，可发布；CSS 与编辑器主题同源简化版）
     return `<!doctype html>
 <html lang="zh-CN">
@@ -125,7 +158,7 @@ export function createExportModule(api: AppApi): ExportModule {
   </style>
 </head>
 <body>
-${String(html)}
+${htmlBody}
 </body>
 </html>`
   }

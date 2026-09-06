@@ -20,26 +20,6 @@
 | pnpm | 11.x | workspace 管理 |
 | 浏览器 | 现代 Chrome/Edge | 使用 IndexedDB |
 
-## ⚠️ 本机 Node 版本陷阱（重要）
-
-`D:\DevTools\nodejs` 是 nvm 软链，当前可能指向 **v14**（v14 无法运行 `??=` 语法，vite-plus/vitest 都会崩）。
-
-**运行任何命令前，先切到 v22：**
-
-```bash
-nvm use 22.22.1        # 方案 A：切换 nvm 软链
-# 或
-dev-tool <命令>         # 方案 B：用项目内固定 v22 工具链包装
-```
-
-`dev-tool.cmd` 会把 node v22.22.1 目录注入 PATH 最前，再透传命令：
-
-```bash
-dev-tool pnpm dev
-dev-tool pnpm test
-dev-tool npx tsc --noEmit
-```
-
 ---
 
 ## 快速开始

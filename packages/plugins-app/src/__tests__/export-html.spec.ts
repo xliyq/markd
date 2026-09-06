@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import 'fake-indexeddb/auto'
 import { DexieStorageProvider } from '@editor/infra'
-import { createExportModule } from '../export'
+import { inlineAssetRefs, createExportModule } from '../export'
 
 /**
  * Phase 2 —— 导出 HTML 单测（M3.2）：
@@ -97,5 +97,18 @@ const a = 1
     expect(html).toContain('&lt;B&gt;')
     expect(html).toContain('&amp;')
     expect(html).not.toContain('<B>') // 未转义的原始标签
+  })
+})
+
+describe("inlineAssetRefs", () => {
+  it("把本地资产 src 替换为 data URL", () => {
+    const html = '<img src="assets/a.png" alt="x"><img src="https://r.com/b.png">'
+    const out = inlineAssetRefs(html, { "assets/a.png": "data:image/png;base64,AAA" })
+    expect(out).toContain('src="data:image/png;base64,AAA"')
+    expect(out).toContain('src="https://r.com/b.png"')
+  })
+  it("未收集到的 relPath 原样保留", () => {
+    const out = inlineAssetRefs('<img src="assets/missing.png">', {})
+    expect(out).toContain('src="assets/missing.png"')
   })
 })
