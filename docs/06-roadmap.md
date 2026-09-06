@@ -181,6 +181,26 @@
 
 ---
 
+## Phase 5 进展（2026-09-05 应用壳 Naive UI + 渲染层统一批改）
+
+**Naive UI 应用壳迁移**（ADR-021）：设置中心（n-menu 左页签：通用/编辑区/插件/数据，72vh 高度封顶，主题桥接 n-config-provider + CSS 变量 naiveOverrides）、InputDialog/welcome 弹窗、查找替换面板、文档树（n-tree + render-prefix/suffix）、工具栏按钮；e2e 全套改 naive 选择器。
+
+**渲染层统一原则（两次教训定稿）**：任何内容交互（手柄/浮层/预览/编辑）必须绑定渲染层（节点类型/DOM/mark），绝不能依赖插入入口——同一内容不管从哪进渲染一致，新增入口自动覆盖。案例：
+- 链接悬浮浮层：doc 遍历按 href 匹配 link mark（弃用 posAtDOM/resolve.marks，tooltip 入口链接在段落中部时 pos 不落 mark 内）→ toolbar 弹窗 + milkdown-tooltip 两条路径统一
+- 图片：image-block + image 双形态合一（渲染层交互对齐），粘贴/拖拽/URL/文件选择器/弹窗全入口统一
+- 图片弹窗：URL 直链 + 本地上传（requestImage 桥 + imageManager.saveImageFile → assets）
+
+**编辑内核补全**：
+- 历史撤销/重做：history 插件（此前已装未注册，Ctrl+Z 一直无效）→ L1 第 14 插件
+- 块句柄 + 插入模式：点 + 不预插入 → 菜单选完类型才在锚点插入（showAt 第三参 insertModeAt + insertBlockAt 用 schema.nodes.* 构造）；新增「图片」独立菜单项（插 image-block）
+- markdown 粘贴解析：Typora 风格 handlePaste（new Slice(node.content,0,0)），h2/li/bq/code 全解析
+
+**UI 批改（文档树/侧边栏）**：文件名单行省略 + SVG 图标；新增弹窗（位置下拉递归文件夹 + 类型 + 名称）；侧边栏折叠按钮移右边缘悬浮（六点）；节点操作默认隐藏/悬浮或选中显示。
+
+**质量**：7 e2e + 167 单测 + typecheck 0 全绿（perf-baseline 机器敏感阈值，单独跑 1.5s 通过）。
+
+**已提交 git**：root commit 0a1d1a9（143 文件，24,799 行）。
+
 ## Phase 5 进展（2026-09-01）
 
 **核心完成（150 测试全绿）**：
