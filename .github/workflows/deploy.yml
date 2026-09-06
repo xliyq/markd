@@ -28,7 +28,8 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11
+          # 自动读取 package.json 的 packageManager 字段（pnpm@11.18.0），避免硬编码版本解析失败
+          version: 11.18.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
