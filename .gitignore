@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+.vp/
+coverage/
+
+# 日志
+*.log
+
+# 测试/工具产物
+test-results/
+_crops/
+.zhanlu/
+_zhanlu/

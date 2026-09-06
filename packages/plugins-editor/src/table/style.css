@@ -1,0 +1,332 @@
+/* ── Milkdown table-block 组件样式（逐字对齐官方 Crepe table.css @7.22.1）──
+ *
+ * 来源：@milkdown/crepe@7.22.1 src/theme/common/table.css（jsdelivr 拉取）
+ * 官方为 SCSS 嵌套写法，此处展开为平铺规则，语义/数值与官方一致。
+ *
+ * DOM 结构（@milkdown/components table-block/view/component.tsx）：
+ *   div.milkdown-table-block
+ *     ├── .handle.cell-handle[data-role="col-drag-handle"]  → 列拖拽（列顶居中胶囊）
+ *     │   └── .button-group → 对齐/删除按钮组
+ *     ├── .handle.cell-handle[data-role="row-drag-handle"]  → 行拖拽（行左居中胶囊）
+ *     │   └── .button-group → 删除按钮
+ *     ├── .table-wrapper
+ *     │   ├── .drag-preview → 拖拽预览
+ *     │   ├── .handle.line-handle[data-role="x-line-drag-handle"] → +行（水平线）
+ *     │   ├── .handle.line-handle[data-role="y-line-drag-handle"] → +列（垂直线）
+ *     │   └── table.children
+ *
+ * 显隐机制：JS 通过 data-show="true"/"false" 控制；官方规则仅 opacity:0（不用 display:none），
+ * 以便 computePosition 持续测量。任何 !important 强制可见都会破坏该机制（2026-09-04 事故）。
+ */
+
+.milkdown-table-block {
+  display: block;
+  margin: 4px 0;
+}
+
+.milkdown-table-block th,
+.milkdown-table-block td {
+  border: 1px solid color-mix(in srgb, var(--crepe-color-outline, #817567), transparent 80%);
+  padding: 4px 16px;
+}
+.milkdown-table-block th .ProseMirror-selectednode,
+.milkdown-table-block td .ProseMirror-selectednode {
+  background-color: transparent !important;
+}
+.milkdown-table-block th:has(.ProseMirror-selectednode),
+.milkdown-table-block td:has(.ProseMirror-selectednode) {
+  outline: 1px solid var(--crepe-color-primary, #805610);
+  outline-offset: -1px;
+}
+
+/* ── 选中单元格：官方为 var(--crepe-color-selected) + opacity .4 ── */
+.milkdown-table-block .selectedCell::after {
+  background-color: var(--crepe-color-selected, #ede0d4);
+  opacity: 0.4;
+}
+.milkdown-table-block .selectedCell ::selection {
+  background: transparent;
+}
+
+/* ── 拖拽预览 ── */
+.milkdown-table-block .drag-preview {
+  background-color: var(--crepe-color-surface, #fff8f4);
+  opacity: 0.4;
+  position: absolute;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  outline: 1px solid var(--crepe-color-primary, #805610);
+  outline-offset: -1px;
+}
+.milkdown-table-block .drag-preview[data-show='false'] {
+  display: none;
+}
+.milkdown-table-block .drag-preview th:has(.ProseMirror-selectednode),
+.milkdown-table-block .drag-preview td:has(.ProseMirror-selectednode) {
+  outline: none;
+}
+
+/* ── 手柄基础（显隐由 data-show 控制，仅 opacity 过渡）── */
+.milkdown-table-block .handle {
+  position: absolute;
+  font-size: calc(var(--crepe-base-font-size, 16px) * 0.875);
+  transition: opacity ease-in-out 0.2s;
+}
+.milkdown-table-block .handle[data-show='false'] {
+  opacity: 0;
+}
+
+.milkdown-table-block svg {
+  fill: var(--crepe-color-outline, #817567);
+}
+
+/* ── 单元格拖拽把手（cell-handle）── */
+.milkdown-table-block .cell-handle {
+  z-index: 50;
+  left: -999px;
+  top: -999px;
+  cursor: grab;
+  background-color: var(--crepe-color-surface, #fff8f4);
+  color: var(--crepe-color-outline, #817567);
+  border-radius: 100px;
+  box-shadow: var(--crepe-shadow-1, 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3));
+  transition: background-color 0.2s ease-in-out;
+}
+.milkdown-table-block .cell-handle:hover {
+  background-color: var(--crepe-color-hover, #f9ecdf);
+}
+.milkdown-table-block .cell-handle:has(.button-group:hover) {
+  background-color: var(--crepe-color-surface, #fff8f4);
+}
+.milkdown-table-block .cell-handle[data-role='col-drag-handle'] {
+  transform: translateY(50%);
+  padding: 0 6px;
+  width: 28px;
+  height: 16px;
+}
+.milkdown-table-block .cell-handle[data-role='row-drag-handle'] {
+  transform: translateX(50%);
+  padding: 6px 0;
+  width: 16px;
+  height: 28px;
+}
+
+/* ── 按钮组（列对齐/删除）── */
+.milkdown-table-block .cell-handle .button-group {
+  position: absolute;
+  transform: translateX(-50%);
+  left: 50%;
+  top: -52px;
+  display: flex;
+  background-color: var(--crepe-color-surface, #fff8f4);
+  border-radius: 8px;
+  box-shadow: var(--crepe-shadow-1, 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3));
+}
+.milkdown-table-block .cell-handle .button-group::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  height: 8px;
+  background-color: transparent;
+  width: 100%;
+}
+.milkdown-table-block .cell-handle .button-group[data-show='false'] {
+  display: none;
+}
+.milkdown-table-block .cell-handle .button-group button {
+  cursor: pointer;
+  margin: 6px;
+  padding: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 4px;
+}
+.milkdown-table-block .cell-handle .button-group button svg {
+  width: 24px;
+  height: 24px;
+}
+.milkdown-table-block .cell-handle .button-group button:hover {
+  border-radius: 8px;
+  background-color: var(--crepe-color-hover, #f9ecdf);
+}
+.milkdown-table-block .cell-handle .button-group button:active {
+  background: var(--crepe-color-selected, #ede0d4);
+}
+.milkdown-table-block .cell-handle:hover {
+  opacity: 1;
+}
+
+/* ── +行/+列 手柄（line-handle）── */
+.milkdown-table-block .line-handle {
+  z-index: 20;
+  background-color: var(--crepe-color-primary, #805610);
+}
+.milkdown-table-block .line-handle:hover {
+  opacity: 1;
+}
+.milkdown-table-block .line-handle .add-button {
+  cursor: pointer;
+  background-color: var(--crepe-color-surface, #fff8f4);
+  color: var(--crepe-color-outline, #817567);
+  border-radius: 100px;
+  box-shadow: var(--crepe-shadow-1, 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3));
+  transition: background-color 0.2s ease-in-out;
+}
+.milkdown-table-block .line-handle .add-button svg {
+  width: 16px;
+  height: 16px;
+}
+.milkdown-table-block .line-handle .add-button:hover {
+  background-color: var(--crepe-color-hover, #f9ecdf);
+}
+.milkdown-table-block .line-handle .add-button:active {
+  background: var(--crepe-color-selected, #ede0d4);
+}
+.milkdown-table-block .line-handle[data-role='x-line-drag-handle'] {
+  height: 1px;
+  z-index: 2;
+}
+.milkdown-table-block .line-handle[data-role='x-line-drag-handle'] .add-button {
+  position: absolute;
+  transform: translateX(-50%) translateY(-50%);
+  padding: 6px 0;
+  width: 16px;
+  height: 28px;
+}
+.milkdown-table-block .line-handle[data-role='y-line-drag-handle'] {
+  width: 1px;
+  z-index: 1;
+}
+.milkdown-table-block .line-handle[data-role='y-line-drag-handle'] .add-button {
+  position: absolute;
+  transform: translateY(-50%) translateX(-50%);
+  padding: 0 6px;
+  width: 28px;
+  height: 16px;
+}
+/* 拖拽进行中隐藏 + 按钮（官方 data-display-type='indicator'） */
+.milkdown-table-block .line-handle[data-display-type='indicator'] .add-button {
+  display: none;
+}
+
+/* ── 只读模式 ── */
+.milkdown-table-block.readonly .handle {
+  display: none;
+}
+
+/* ── children 表格（与官方一致由上方 th/td 规则覆盖；此规则保留给测试基线）── */
+.milkdown-table-block table.children {
+  width: 100%;
+}
+
+/* ── 覆盖 Nord prose 表格样式（对齐官方 Crepe 观感）──
+ * Nord 的 .milkdown-theme-nord.prose 表格规则（斑马纹 nth-child(odd) 灰底、shadow-md、
+ * rounded-lg、font-size 14px、tr border-b）优先级 (0,3,0)+ 高于 .milkdown-table-block 单类规则，
+ * 必须用更高优先级选择器拉回 Crepe 官方观感：无斑马纹、无阴影、细边框、继承字号。
+ */
+.milkdown .milkdown-theme-nord.prose table {
+  box-shadow: none;
+  border-radius: 0;
+  border-width: 0;
+  font-size: inherit;
+}
+.milkdown .milkdown-theme-nord.prose tr {
+  border-bottom: none;
+}
+.milkdown .milkdown-theme-nord.prose :where(td, th):nth-child(odd) {
+  background: transparent;
+}
+.milkdown .milkdown-theme-nord.prose td,
+.milkdown .milkdown-theme-nord.prose th {
+  padding-inline: 16px;
+  padding-block: 4px;
+}
+
+/* ── 手柄图标居中（对齐官方 reset.css 的 .milkdown-icon inline-flex 方案）──
+ * 官方 reset.css：.milkdown .milkdown-icon { display:inline-flex; align-items:center; justify-content:center }
+ * 我们的胶囊（28×16 / 16×28）靠它让 '=' / '+' 字形在胶囊内水平垂直居中。
+ */
+.milkdown .milkdown-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.milkdown-table-block .milkdown-icon {
+  line-height: 1;
+}
+.milkdown-table-block .cell-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.milkdown-table-block .line-handle .add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.milkdown-table-block .cell-handle .button-group button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Crepe 主题变量（官方 crepe/style.css，light）── */
+.milkdown {
+  --crepe-color-background: #fffdfb;
+  --crepe-color-on-background: #1f1b16;
+  --crepe-color-surface: #fff8f4;
+  --crepe-color-surface-low: #fff1e5;
+  --crepe-color-on-surface: #201b13;
+  --crepe-color-on-surface-variant: #4f4539;
+  --crepe-color-outline: #817567;
+  --crepe-color-primary: #805610;
+  --crepe-color-secondary: #fbdebc;
+  --crepe-color-on-secondary: #271904;
+  --crepe-color-inverse: #362f27;
+  --crepe-color-on-inverse: #fcefe2;
+  --crepe-color-inline-code: #ba1a1a;
+  --crepe-color-error: #ba1a1a;
+  --crepe-color-hover: #f9ecdf;
+  --crepe-color-selected: #ede0d4;
+  --crepe-color-inline-area: #e4d8cc;
+  --crepe-base-font-size: 16px;
+  --crepe-font-title: Georgia, Cambria, 'Times New Roman', Times, serif;
+  --crepe-font-default: 'Open Sans', Arial, Helvetica, sans-serif;
+  --crepe-font-code: Fira Code, Menlo, Monaco, 'Courier New', Courier, monospace;
+  --crepe-shadow-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  --crepe-shadow-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Crepe 主题变量（dark，跟随 html[data-theme="dark"]）── */
+html[data-theme='dark'] .milkdown {
+  --crepe-color-background: #1f1b16;
+  --crepe-color-on-background: #eae1d9;
+  --crepe-color-surface: #18120b;
+  --crepe-color-surface-low: #201b13;
+  --crepe-color-on-surface: #ede0d4;
+  --crepe-color-on-surface-variant: #d3c4b4;
+  --crepe-color-outline: #9c8f80;
+  --crepe-color-primary: #f4bd6f;
+  --crepe-color-secondary: #56442a;
+  --crepe-color-on-secondary: #fbdebc;
+  --crepe-color-inverse: #ede0d4;
+  --crepe-color-on-inverse: #362f27;
+  --crepe-color-inline-code: #ffb4ab;
+  --crepe-color-error: #ffb4ab;
+  --crepe-color-hover: #251f17;
+  --crepe-color-selected: #3b342b;
+  --crepe-color-inline-area: #3f3830;
+  --crepe-font-title: Georgia, Cambria, 'Times New Roman', Times, serif;
+  --crepe-font-default: 'Open Sans', Arial, Helvetica, sans-serif;
+  --crepe-font-code: Fira Code, Menlo, Monaco, 'Courier New', Courier, monospace;
+  --crepe-shadow-1: 0px 1px 2px 0px rgba(255, 255, 255, 0.3), 0px 1px 3px 1px rgba(255, 255, 255, 0.15);
+  --crepe-shadow-2: 0px 1px 2px 0px rgba(255, 255, 255, 0.3), 0px 2px 6px 2px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Nord 主题兼容：selectedCell 用 Crepe 变量（Nord 的 nord8 覆盖退位）── */
+.milkdown .milkdown-theme-nord.prose.ProseMirror .selectedCell:after {
+  background-color: var(--crepe-color-selected, #ede0d4);
+  opacity: 0.4;
+}

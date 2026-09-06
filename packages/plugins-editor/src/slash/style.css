@@ -1,0 +1,71 @@
+/* Slash 菜单 — 逐字对齐官方 Crepe block-edit.css 的 .milkdown-slash-menu 观感
+ * 官方：surface 底 + shadow-1 + 12px 圆角 + 菜单项 14px/600 + hover 用 hover 色
+ * 我们 DOM：.milkdown-slash > button.slash-item > .slash-label + .slash-hint
+ */
+.milkdown-slash[data-show="false"] {
+  display: none;
+}
+.milkdown-slash {
+  position: absolute;
+  z-index: 100;
+  display: block;
+  font-family: var(--crepe-font-default, 'Open Sans', Arial, Helvetica, sans-serif);
+  color: var(--crepe-color-on-surface, #201b13);
+  background: var(--crepe-color-surface, #fff8f4);
+  border-radius: 12px;
+  box-shadow: var(--crepe-shadow-1, 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3));
+  overflow: hidden;
+  min-width: 220px;
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.milkdown-slash .slash-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  min-width: 220px;
+  padding: 14px 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.milkdown-slash .slash-item:hover,
+.milkdown-slash .slash-item.active {
+  background: var(--crepe-color-hover, #f9ecdf);
+}
+
+.milkdown-slash .slash-label {
+  font-size: calc(var(--crepe-base-font-size, 16px) * 0.875);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 20px;
+  flex: 1;
+}
+
+.milkdown-slash .slash-hint {
+  font-size: calc(var(--crepe-base-font-size, 16px) * 0.75);
+  font-weight: 600;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--crepe-color-on-surface, #201b13), transparent 40%);
+}
+
+/* 菜单底部条目间分隔线观感（第一项上不留线） */
+.milkdown-slash .slash-item + .slash-item {
+  border-top: 1px solid color-mix(in srgb, var(--crepe-color-outline, #817567), transparent 92%);
+}
+
+/* slash 菜单图标（对齐官方 label 结构） */
+.milkdown .milkdown-slash .slash-item .slash-icon {
+  width: 26px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 15px;
+}

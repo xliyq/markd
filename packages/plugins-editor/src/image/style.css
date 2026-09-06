@@ -1,0 +1,65 @@
+/* 图片块：resize 手柄（官方内置拖拽） + 选中/悬停显隐 */
+.milkdown .milkdown-image-block {
+  position: relative;
+  min-width: 48px;
+  min-height: 48px;
+}
+.milkdown .milkdown-image-block img {
+  min-width: 48px;
+  min-height: 48px;
+  background: var(--crepe-color-surface, #f0efed);
+}
+.milkdown .milkdown-image-block .image-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  border-right: 3px solid var(--crepe-color-outline, #817567);
+  border-bottom: 3px solid var(--crepe-color-outline, #817567);
+  border-bottom-right-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.milkdown .milkdown-image-block:hover .image-resize-handle,
+.milkdown .milkdown-image-block:focus-within .image-resize-handle,
+.milkdown .milkdown-image-block.selected .image-resize-handle { opacity: 1; }
+
+/* 自定义 image NodeView（渲染层统一）：figure 块 + resize 手柄 */
+.milkdown .milkdown-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 8px 0;
+  vertical-align: middle;
+  /* 加载失败/加载中也要有可 hover/点击的区域（否则 0×0 无手柄可挂） */
+  min-width: 48px;
+  min-height: 48px;
+}
+.milkdown .milkdown-image img {
+  display: block;
+  max-width: 100%;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 4px;
+  background: var(--crepe-color-surface, #f0efed);
+}
+.milkdown .milkdown-image .image-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  border-right: 3px solid var(--crepe-color-outline, #817567);
+  border-bottom: 3px solid var(--crepe-color-outline, #817567);
+  border-bottom-right-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.milkdown .milkdown-image:hover .image-resize-handle,
+.milkdown .milkdown-image.selected .image-resize-handle,
+.milkdown .milkdown-image:focus-within .image-resize-handle { opacity: 1; }

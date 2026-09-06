@@ -1,0 +1,12 @@
+/* 查找/替换高亮 */
+
+.find-match {
+  background: rgba(250, 204, 21, 0.35);
+  border-radius: 2px;
+}
+
+.find-current {
+  background: rgba(250, 204, 21, 0.7);
+  outline: 1px solid #f59e0b;
+  border-radius: 2px;
+}

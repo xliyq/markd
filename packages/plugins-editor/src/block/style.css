@@ -1,0 +1,66 @@
+/* 块拖拽句柄 — 逐字对齐官方 Crepe block-edit.css 的 .milkdown-block-handle
+ * 官方：handle flex + gap 2px；operation-item 32×32 padding 4px；
+ * svg 24×24 fill outline 色；hover 用 hover 色；active（按住）用 selected 色。
+ * 我们 DOM：.milkdown-block-handle > .block-handle-add + .block-handle-grip
+ */
+
+/* 编辑器容器焦点样式 — 移除默认 outline */
+.milkdown .ProseMirror,
+.milkdown .ProseMirror:focus,
+.milkdown .ProseMirror-focused {
+  outline: none !important;
+}
+
+.milkdown .milkdown-block-handle {
+  transition: all 0.2s;
+  position: absolute;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  z-index: 10;
+}
+.milkdown .milkdown-block-handle[data-show='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.milkdown .milkdown-block-handle[data-show='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 操作项（add / grip）= 官方 .operation-item */
+.milkdown .milkdown-block-handle .block-handle-add,
+.milkdown .milkdown-block-handle .block-handle-grip {
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+}
+.milkdown .milkdown-block-handle svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--crepe-color-outline, #817567);
+  color: var(--crepe-color-outline, #817567);
+}
+.milkdown .milkdown-block-handle .block-handle-add:hover,
+.milkdown .milkdown-block-handle .block-handle-grip:hover {
+  background: var(--crepe-color-hover, #f9ecdf);
+}
+/* 按住 "+" 时的 active 态（block/index.ts pointerdown 加 active 类） */
+.milkdown .milkdown-block-handle .block-handle-add.active {
+  background: var(--crepe-color-selected, #ede0d4);
+}
+.milkdown .milkdown-block-handle .block-handle-grip {
+  cursor: grab;
+}
+.milkdown .milkdown-block-handle .block-handle-grip:active {
+  cursor: grabbing;
+}

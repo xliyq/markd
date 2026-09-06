@@ -1,0 +1,76 @@
+/* 选中文本浮层工具栏 */
+
+.milkdown-tooltip {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 0;
+  background: var(--crepe-color-surface, #fff8f4);
+  border: none;
+  border-radius: 8px;
+  box-shadow: var(--crepe-shadow-1, 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3));
+  overflow: hidden;
+  z-index: 100;
+}
+
+.milkdown-tooltip[data-show="false"] {
+  display: none !important;
+}
+
+.milkdown-tooltip .tooltip-btn {
+  min-width: 32px;
+  height: 32px;
+  margin: 3px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--crepe-color-on-surface, #201b13);
+}
+
+.milkdown-tooltip .tooltip-btn:hover {
+  background: var(--crepe-color-hover, #f9ecdf);
+}
+
+.milkdown-tooltip .tooltip-btn:active {
+  background: var(--crepe-color-selected, #ede0d4);
+}
+
+/* ── 链接悬浮浮层（自研：fixed 视口定位，body 下）── */
+.milkdown-link-hover {
+  position: fixed;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg, #fffdfb);
+  border: 1px solid var(--border, #e0dcd3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+  font-size: 13px;
+  color: var(--text, #201b13);
+}
+.milkdown-link-hover .lh-link {
+  color: var(--accent, #2563eb);
+  text-decoration: underline;
+  cursor: pointer;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.milkdown-link-hover .lh-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: inherit;
+  white-space: nowrap;
+}
+.milkdown-link-hover .lh-btn:hover { background: var(--bg-soft, #f0efed); }
+.milkdown-link-hover .lh-btn.danger:hover { color: #ef4444; background: #fef2f2; }

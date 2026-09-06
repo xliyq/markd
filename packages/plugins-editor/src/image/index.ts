@@ -1,0 +1,97 @@
+/**
+ * 图片（M4）—— 渲染层统一
+ *
+ * 所有插入路径（粘贴/拖拽/URL 直链/工具栏弹窗/文件选择器）最终都落到 image 节点或 image-block 节点，
+ * 渲染层各自有 NodeView：本插件给标准 image 节点注册自定义 $view（figure + resize 手柄 + assets 解析），
+ * 因此与插入方式彻底解耦——任何方式进来的图片都是同一形态；解析路径（remark）产出的 image-block 由官方组件渲染。
+ */
+import { upload } from '@milkdown/kit/plugin/upload'
+import { imageBlockComponent } from '@milkdown/components/image-block'
+import { imageUrlPaste } from './url-paste'
+import { $view, $ctx } from '@milkdown/utils'
+import { imageSchema } from '@milkdown/kit/preset/commonmark'
+import type { Node as PMNode } from '@milkdown/prose/model'
+import type { MilkdownPluginManifest } from '@editor/core'
+import { injectPluginStyle } from '../style-inject'
+import imageStyle from './style.css?inline'
+
+/** 图片渲染配置（渲染层统一：assets 相对路径 → blob URL 由装配者注入） */
+export const imageConfig = $ctx<
+  { proxyDomURL?: (url: string) => Promise<string> | string },
+  'imageConfigCtx'
+>({}, 'imageConfigCtx')
+
+/** 自定义 image NodeView：任何方式插入的 image 节点统一渲染为带 resize 手柄的图片块 */
+export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
+  const dom = document.createElement('figure')
+  dom.className = 'milkdown-image'
+  dom.contentEditable = 'false'
+  const img = document.createElement('img')
+  const handle = document.createElement('div')
+  handle.className = 'image-resize-handle'
+  dom.append(img, handle)
+
+  const config = ctx.get(imageConfig.key)
+  let currentSrc: string | null = null
+  function setSrc(src: string) {
+    if (src === currentSrc) return
+    currentSrc = src
+    const resolved = config.proxyDomURL ? config.proxyDomURL(src) : src
+    Promise.resolve(resolved).then((url) => {
+      img.src = url
+    })
+  }
+  function bindAttrs(node: PMNode) {
+    setSrc(node.attrs.src as string)
+    img.alt = (node.attrs.alt as string) ?? ''
+    if (node.attrs.title) img.title = node.attrs.title as string
+  }
+  bindAttrs(initialNode)
+
+  // resize：右下角拖拽（DOM 级；持久化 attrs 后续扩展）
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startY = e.clientY
+    const startW = img.clientWidth || img.naturalWidth || 300
+    const startH = img.clientHeight || img.naturalHeight || 200
+    const onMove = (ev: PointerEvent) => {
+      img.style.width = `${Math.max(48, startW + (ev.clientX - startX))}px`
+      img.style.height = `${Math.max(48, startH + (ev.clientY - startY))}px`
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  })
+
+  return {
+    dom,
+    update: (updatedNode: PMNode) => {
+      if (updatedNode.type !== initialNode.type) return false
+      bindAttrs(updatedNode)
+      return true
+    },
+    selectNode: () => dom.classList.add('selected'),
+    deselectNode: () => dom.classList.remove('selected'),
+    destroy: () => dom.remove(),
+  }
+})
+
+export const imageManifest: MilkdownPluginManifest = {
+  id: 'image',
+  type: 'milkdown',
+  name: '图片',
+  version: '1.0.0',
+  description: '图片渲染（统一 resize 手柄）+ 粘贴/拖拽/URL 直链/文件选择器插入（M4）',
+  dependsOn: ['commonmark'],
+  defaultEnabled: true,
+  create: () => {
+    injectPluginStyle('image', imageStyle)
+    // imageConfig 是 $ctx 插件，必须随组件注入（否则 imageConfigCtx 未注册，NodeView get 报 not found）
+    return [...upload, imageUrlPaste, imageConfig, imageNodeView, ...imageBlockComponent]
+  },
+}
