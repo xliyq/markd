@@ -50,6 +50,10 @@ const emit = defineEmits<{
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
   flex-wrap: wrap;
+  /* 固定于编辑区顶部（.main 滚动时工具栏不滚走） */
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 .toolbar-group { display: flex; align-items: center; gap: 4px; }
 .toolbar-sep { width: 1px; height: 18px; background: var(--border-soft); margin: 0 4px; }
