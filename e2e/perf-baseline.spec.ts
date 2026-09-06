@@ -10,6 +10,10 @@ import { test, expect, Page } from '@playwright/test'
 async function openApp(page: Page) {
   await page.goto('/')
   await expect(page.locator('.app-shell')).toBeVisible({ timeout: 15000 })
+  // 跳过欢迎（n-modal 打开状态下导入会慢 1-2s，与其余 e2e 一致）
+  const skip = page.locator('.n-modal button', { hasText: '跳过' })
+  if (await skip.count()) await skip.first().click()
+  await page.waitForTimeout(300)
 }
 
 test('5000 行文档导入并打开 < 1s（真实浏览器）', async ({ page }) => {
