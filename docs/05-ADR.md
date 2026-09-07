@@ -491,3 +491,12 @@ Playwright 探针验证：n-modal=1、3 radio、25 switch(全 active)、切暗�
   修复：返回对象改 getter `get editor() { return editor }`。判断「字段 vs getter」：闭包变量后续重新赋值时必须 getter。
 - EditorInstance 新增 replaceMarkdown（parserCtx 解析 → replaceWith(0, doc.content.size, node.content)）。
 - 验证：取原文/编辑/切回渲染(引用/标题/列表)/刷新持久化全通；线上 https://xliyq.github.io/markd/ 实测通过。
+
+**2026-09-07 主题统一：应用壳 + 编辑器正文共用一套 token（ADR-023）**：
+- 现状问题：壳层走 data-theme + CSS 变量 token（--bg/--text/--accent），编辑器正文走 nord 官方配色
+  （暗色下正文米白 rgb(234,225,217) vs 壳层 --text #e5e5e5，色调割裂；跟随系统时正文不完全跟随）。
+- 决策：**单一主题体系**——data-theme 一套变量控制全部 UI（壳层 + 正文）。
+- 落地路径（待实现）：保留 nord 排版与组件样式，把 nord 色值覆盖为 var(--x)（正文/标题/代码/链接/引用），
+  做法同 naive 桥接；nord 官方规则特异性 (0,3,0)，覆盖需同级/更高前缀。
+- 收益：主题切换全局一致；未来新增主题只需加一组 :root[data-theme] 变量。
+- 状态：已确认方向，未实现（列入待办）。
