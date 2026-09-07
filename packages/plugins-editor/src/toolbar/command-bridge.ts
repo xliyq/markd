@@ -75,6 +75,31 @@ export function requestLink(opts: LinkPromptOptions): Promise<LinkResult | null>
   return linkHandler(opts)
 }
 
+/** 图片属性编辑请求（M4.3 alt/title）：App 层 naive modal 承接（输入不能进编辑器 DOM） */
+export interface ImageAttrOptions {
+  title: string
+  initialAlt: string
+  initialTitle: string
+}
+export interface ImageAttrResult {
+  alt: string
+  title: string
+}
+type ImageAttrHandler = (opts: ImageAttrOptions) => Promise<ImageAttrResult | null>
+
+let imageAttrHandler: ImageAttrHandler | null = null
+
+/** App 层注册图片属性对话框 */
+export function setImageAttrPrompt(handler: ImageAttrHandler): void {
+  imageAttrHandler = handler
+}
+
+/** NodeView 发起属性编辑请求；无处理器时返回 null */
+export function requestImageAttr(opts: ImageAttrOptions): Promise<ImageAttrResult | null> {
+  if (!imageAttrHandler) return Promise.resolve(null)
+  return imageAttrHandler(opts)
+}
+
 /** 图片输入请求（URL 或 本地文件上传）：App 层实现 URL 输入 + 文件选择 */
 export interface ImagePromptOptions {
   title: string

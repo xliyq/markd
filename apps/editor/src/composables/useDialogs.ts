@@ -3,7 +3,7 @@
  * onMounted 注册 setTextPrompt/setLinkPrompt/setImagePrompt，编辑器插件经桥弹窗。
  */
 import { ref, onMounted } from "vue";
-import { setTextPrompt, setLinkPrompt, setImagePrompt } from "@editor/plugins-editor";
+import { setTextPrompt, setLinkPrompt, setImagePrompt, setImageAttrPrompt } from "@editor/plugins-editor";
 import { useShell } from "./useShell";
 
 export function useDialogs() {
@@ -89,6 +89,11 @@ export function useDialogs() {
       };
       return new Promise((resolve) => { linkResolve.value = resolve; });
     });
+    setImageAttrPrompt((opts) => {
+      imageAttrForm.value = { alt: opts.initialAlt, title: opts.initialTitle };
+      imageAttrDialog.value = { initialAlt: opts.initialAlt, initialTitle: opts.initialTitle };
+      return new Promise((resolve) => { imageAttrResolve.value = resolve; });
+    });
     setTextPrompt((opts) => {
       promptDialog.value = {
         title: opts.title,
@@ -100,10 +105,26 @@ export function useDialogs() {
     });
   }
 
+  /** 图片属性对话框（M4.3 alt/title；NodeView 经桥请求，App modal 承接） */
+  const imageAttrDialog = ref<{ initialAlt: string; initialTitle: string } | null>(null);
+  const imageAttrForm = ref({ alt: "", title: "" });
+  const imageAttrResolve = ref<((v: { alt: string; title: string } | null) => void) | null>(null);
+  function onImageAttrConfirm(payload: { alt: string; title: string }) {
+    const r = imageAttrResolve.value;
+    imageAttrDialog.value = null;
+    r?.({ alt: payload.alt, title: payload.title });
+  }
+  function onImageAttrCancel() {
+    const r = imageAttrResolve.value;
+    imageAttrDialog.value = null;
+    r?.(null);
+  }
+
   return {
     promptDialog, onPromptConfirm, onPromptCancel,
     linkDialog, linkForm, onLinkConfirm, onLinkCancel,
     imageDialog, imageForm, onImageFilePicked, onImageConfirm, onImageCancel,
+    imageAttrDialog, imageAttrForm, onImageAttrConfirm, onImageAttrCancel,
     registerPromptBridges,
   };
 }

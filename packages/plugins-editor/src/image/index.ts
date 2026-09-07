@@ -14,6 +14,7 @@ import { editorViewCtx } from '@milkdown/kit/core'
 import { imageSchema } from '@milkdown/kit/preset/commonmark'
 import type { Node as PMNode } from '@milkdown/prose/model'
 import type { MilkdownPluginManifest } from '@editor/core'
+import { requestImageAttr } from '../toolbar/command-bridge'
 import { injectPluginStyle } from '../style-inject'
 import imageStyle from './style.css?inline'
 
@@ -66,64 +67,30 @@ export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
     )
   })
 
-  const popover = document.createElement('div')
-  popover.className = 'image-attr-popover'
-  popover.innerHTML = `
-    <div class="image-attr-title">图片属性</div>
-    <label class="image-attr-row"><span>alt</span><input class="image-attr-alt" placeholder="替代文本（无障碍）" /></label>
-    <label class="image-attr-row"><span>title</span><input class="image-attr-title-input" placeholder="悬停标题" /></label>
-    <div class="image-attr-btns">
-      <button type="button" class="image-attr-cancel">取消</button>
-      <button type="button" class="image-attr-ok">确定</button>
-    </div>`
-  dom.appendChild(popover)
-
   let attrOpen = false
-  function openAttr() {
+  attrBtn.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    if (attrOpen) return
+    // ⚠️ 输入框不能住在编辑器 DOM：keydown 会被 ProseMirror 键表劫持（NodeSelection 下敲字=替换节点）。
+    // 弹窗由 App 层 naive modal 承接（挂 body），保存后经 setNodeMarkup 写回。
     const view = ctx.get(editorViewCtx)
     const sel = view.state.selection
     const node = sel instanceof NodeSelection && sel.node.type === initialNode.type ? sel.node : initialNode
-    const altInput = popover.querySelector('.image-attr-alt') as HTMLInputElement
-    const titleInput = popover.querySelector('.image-attr-title-input') as HTMLInputElement
-    altInput.value = (node.attrs.alt as string) ?? ''
-    titleInput.value = (node.attrs.title as string) ?? ''
-    popover.classList.add('show')
     attrOpen = true
-    altInput.focus()
-  }
-  function closeAttr() {
-    popover.classList.remove('show')
+    const result = await requestImageAttr({
+      title: '图片属性',
+      initialAlt: (node.attrs.alt as string) ?? '',
+      initialTitle: (node.attrs.title as string) ?? '',
+    })
     attrOpen = false
-  }
-  function saveAttr() {
-    const view = ctx.get(editorViewCtx)
-    const sel = view.state.selection
-    const altInput = popover.querySelector('.image-attr-alt') as HTMLInputElement
-    const titleInput = popover.querySelector('.image-attr-title-input') as HTMLInputElement
-    if (sel instanceof NodeSelection && sel.node.type === initialNode.type) {
-      const attrs = {
-        ...sel.node.attrs,
-        alt: altInput.value,
-        title: titleInput.value,
-      }
-      view.dispatch(view.state.tr.setNodeMarkup(sel.$anchor.pos, null, attrs))
+    if (!result) return
+    const viewNow = ctx.get(editorViewCtx)
+    const selNow = viewNow.state.selection
+    if (selNow instanceof NodeSelection && selNow.node.type === initialNode.type) {
+      const attrs = { ...selNow.node.attrs, alt: result.alt, title: result.title }
+      viewNow.dispatch(viewNow.state.tr.setNodeMarkup(selNow.$anchor.pos, null, attrs))
     }
-    closeAttr()
-  }
-  attrBtn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    attrOpen ? closeAttr() : openAttr()
   })
-  popover.querySelector('.image-attr-ok')!.addEventListener('click', (e) => { e.stopPropagation(); saveAttr() })
-  popover.querySelector('.image-attr-cancel')!.addEventListener('click', (e) => { e.stopPropagation(); closeAttr() })
-  const onDocMouseDown = (e: MouseEvent) => {
-    if (attrOpen && !dom.contains(e.target as Node)) closeAttr()
-  }
-  const onDocKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && attrOpen) closeAttr()
-  }
-  document.addEventListener('mousedown', onDocMouseDown)
-  document.addEventListener('keydown', onDocKeydown)
 
   const config = ctx.get(imageConfig.key)
   let currentSrc: string | null = null
@@ -196,8 +163,6 @@ export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
     selectNode: () => dom.classList.add('selected'),
     deselectNode: () => dom.classList.remove('selected'),
     destroy: () => {
-      document.removeEventListener('mousedown', onDocMouseDown)
-      document.removeEventListener('keydown', onDocKeydown)
       dom.remove()
     },
   }

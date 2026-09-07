@@ -10,6 +10,7 @@ import EditorToolbar from "./components/EditorToolbar.vue";
 import SettingsCenter from "./components/SettingsCenter.vue";
 import LinkDialog from "./components/LinkDialog.vue";
 import ImageDialog from "./components/ImageDialog.vue";
+import ImageAttrDialog from "./components/ImageAttrDialog.vue";
 import FindPanel from "./components/FindPanel.vue";
 import SearchPanel from "./components/SearchPanel.vue";
 import OutlinePanel from "./components/OutlinePanel.vue";
@@ -43,7 +44,8 @@ const {
   linkDialog, linkForm, onLinkConfirm, onLinkCancel,
   imageDialog, imageForm, onImageFilePicked, onImageConfirm, onImageCancel,
   registerPromptBridges,
-} = useDialogs();
+    imageAttrDialog, imageAttrForm, onImageAttrConfirm, onImageAttrCancel,
+  } = useDialogs();
 
 /** 主题 */
 const {
@@ -368,6 +370,14 @@ onBeforeUnmount(() => {
         @upload="onImageFilePicked"
         @confirm="onImageConfirm"
       />
+
+    <ImageAttrDialog
+      :show="!!imageAttrDialog"
+      :initial-alt="imageAttrDialog?.initialAlt ?? ''"
+      :initial-title="imageAttrDialog?.initialTitle ?? ''"
+      @update:show="(v: boolean) => !v && onImageAttrCancel()"
+      @confirm="onImageAttrConfirm"
+    />
 
     <!-- 通用文本输入（链接/图片 URL；替代 window.prompt） -->
     <InputDialog
