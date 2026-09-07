@@ -86,25 +86,40 @@ export function useEditor() {
     await b.mountEditor(editorRoot.value as HTMLElement, md, docId ?? undefined);
   }
 
-  /** 图片预览（点击编辑器内图片 → 大图弹层） */
-  const previewImg = ref<{ url: string } | null>(null);
+  /**
+   * 灯箱预览（M4.6）：点击编辑器内图片 → 全屏灯箱（缩放/平移/多图切换/下载复制）。
+   * 打开时收集文档内全部图片（milkdown-image / image-block）→ 支持 ←/→ 切换。
+   */
+  const previewImg = ref<{ images: string[]; index: number } | null>(null);
   async function onEditorClick(e: MouseEvent) {
     const t = e.target as HTMLElement;
-    if (t.closest(".operation-item, input, .image-resize-handle")) return;
+    if (t.closest(".operation-item, input, .image-resize-handle, .image-retry-btn")) return;
     const block = t.closest(".milkdown-image-block, .milkdown-image") as HTMLElement | null;
     if (!block) return;
     const img = block.querySelector("img");
     const src = img?.getAttribute("src") || "";
     if (!src) return;
-    let url = src;
-    if (src.startsWith("assets/")) {
-      const imgMgr = (boot.value?.api as never as Record<string, unknown>).imageManager as
-        | { getBlobUrl?: (docId: string, relPath: string) => Promise<string> }
-        | undefined;
-      const docId = boot.value?.getCurrentDocId();
-      if (imgMgr?.getBlobUrl && docId) url = (await imgMgr.getBlobUrl(docId, src)) || src;
+    // 收集文档内全部图片 src（已是 blob/远程可显示 URL）
+    const all = Array.from(
+      editorRoot.value?.querySelectorAll<HTMLElement>(".milkdown-image-block img, .milkdown-image img") ?? [],
+    )
+      .map((im) => im.getAttribute("src") || "")
+      .filter(Boolean);
+    let index = all.indexOf(src);
+    if (index < 0) {
+      // 当前图不在列表（assets 解析差异）→ 单独解析并追加
+      let url = src;
+      if (src.startsWith("assets/")) {
+        const imgMgr = (boot.value?.api as never as Record<string, unknown>).imageManager as
+          | { getBlobUrl?: (docId: string, relPath: string) => Promise<string> }
+          | undefined;
+        const docId = boot.value?.getCurrentDocId();
+        if (imgMgr?.getBlobUrl && docId) url = (await imgMgr.getBlobUrl(docId, src)) || src;
+      }
+      all.push(url);
+      index = all.length - 1;
     }
-    previewImg.value = { url };
+    previewImg.value = { images: all, index };
   }
 
   /** 打开文档：flush 源码 → 设当前 → 查名 → 挂载编辑器 → 手动刷大纲/字数 */

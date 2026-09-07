@@ -8,7 +8,8 @@
 import { upload } from '@milkdown/kit/plugin/upload'
 import { imageBlockComponent } from '@milkdown/components/image-block'
 import { imageUrlPaste } from './url-paste'
-import { $view, $ctx } from '@milkdown/utils'
+import { $view, $ctx, $prose } from '@milkdown/utils'
+import { Plugin } from '@milkdown/prose/state'
 import { imageSchema } from '@milkdown/kit/preset/commonmark'
 import type { Node as PMNode } from '@milkdown/prose/model'
 import type { MilkdownPluginManifest } from '@editor/core'
@@ -29,18 +30,50 @@ export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
   const img = document.createElement('img')
   const handle = document.createElement('div')
   handle.className = 'image-resize-handle'
-  dom.append(img, handle)
+  // M4.5 加载状态：骨架占位 + 失败占位(含重试)
+  const placeholder = document.createElement('div')
+  placeholder.className = 'image-placeholder'
+  placeholder.innerHTML = `<span class="image-placeholder-icon">🖼</span><span class="image-placeholder-text">加载中…</span>`
+  const retryBtn = document.createElement('button')
+  retryBtn.type = 'button'
+  retryBtn.className = 'image-retry-btn'
+  retryBtn.textContent = '↻ 重试'
+  dom.append(placeholder, img, retryBtn, handle)
 
   const config = ctx.get(imageConfig.key)
   let currentSrc: string | null = null
-  function setSrc(src: string) {
-    if (src === currentSrc) return
+  let failed = false
+  function setSrc(src: string, force = false) {
+    if (src === currentSrc && !force) return
     currentSrc = src
+    failed = false
+    dom.classList.remove('error')
+    dom.classList.add('loading')
+    placeholder.classList.remove('show')
+    retryBtn.classList.remove('show')
     const resolved = config.proxyDomURL ? config.proxyDomURL(src) : src
     Promise.resolve(resolved).then((url) => {
       img.src = url
     })
   }
+  // M4.7 懒加载：进入视口才真正加载（原生 loading=lazy）
+  img.loading = 'lazy'
+  img.addEventListener('load', () => {
+    dom.classList.remove('loading', 'error')
+    placeholder.classList.remove('show')
+    retryBtn.classList.remove('show')
+  })
+  img.addEventListener('error', () => {
+    dom.classList.remove('loading')
+    dom.classList.add('error')
+    placeholder.classList.add('show')
+    placeholder.querySelector('.image-placeholder-text')!.textContent = '加载失败'
+    retryBtn.classList.add('show')
+  })
+  retryBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    setSrc(currentSrc ?? '', true) // force：清失败态重新加载
+  })
   function bindAttrs(node: PMNode) {
     setSrc(node.attrs.src as string)
     img.alt = (node.attrs.alt as string) ?? ''
@@ -81,6 +114,32 @@ export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
   }
 })
 
+/**
+ * M4.7 大图懒加载：image-block（官方组件）的 img 补 loading="lazy"。
+ * 原生 lazy 依赖 img 标签属性；官方组件不暴露，用 MutationObserver 给 DOM 里的 img 统一补。
+ */
+const lazyClass = 'milkdown-lazy-applied'
+function applyLazy(root: ParentNode) {
+  root
+    .querySelectorAll<HTMLImageElement>('.milkdown-image-block img, .milkdown-image img')
+    .forEach((im) => {
+      if (!im.classList.contains(lazyClass)) {
+        im.loading = 'lazy'
+        im.classList.add(lazyClass)
+      }
+    })
+}
+const imageLazyPlugin = $prose((_ctx) => {
+  return new Plugin({
+    view: (view) => {
+      applyLazy(view.dom)
+      const mo = new MutationObserver(() => applyLazy(view.dom))
+      mo.observe(view.dom, { childList: true, subtree: true })
+      return { destroy: () => mo.disconnect() }
+    },
+  })
+})
+
 export const imageManifest: MilkdownPluginManifest = {
   id: 'image',
   type: 'milkdown',
@@ -92,6 +151,6 @@ export const imageManifest: MilkdownPluginManifest = {
   create: () => {
     injectPluginStyle('image', imageStyle)
     // imageConfig 是 $ctx 插件，必须随组件注入（否则 imageConfigCtx 未注册，NodeView get 报 not found）
-    return [...upload, imageUrlPaste, imageConfig, imageNodeView, ...imageBlockComponent]
+    return [...upload, imageUrlPaste, imageConfig, imageNodeView, imageLazyPlugin, ...imageBlockComponent]
   },
 }

@@ -14,6 +14,7 @@ import FindPanel from "./components/FindPanel.vue";
 import SearchPanel from "./components/SearchPanel.vue";
 import OutlinePanel from "./components/OutlinePanel.vue";
 import WelcomeOverlay from "./components/WelcomeOverlay.vue";
+import Lightbox from "./components/Lightbox.vue";
 import { NConfigProvider, darkTheme, type GlobalThemeOverrides } from "naive-ui";
 import { useShell } from "./composables/useShell";
 import { useEditor } from "./composables/useEditor";
@@ -447,18 +448,14 @@ onBeforeUnmount(() => {
 
       <StatusBar :status-text="statusText" :doc-stats-text="statsText" :source-mode="sourceMode" />
     </div>
-      <!-- 图片预览大图（点击编辑器内图片触发） -->
-      <div
+      <!-- 灯箱预览（M4.6：点击图片全屏放大/缩放/平移/多图切换/下载复制） -->
+      <Lightbox
         v-if="previewImg"
-        class="image-preview-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-label="图片预览"
-        @click="previewImg = null"
-      >
-        <img :src="previewImg.url" class="image-preview-img" alt="预览大图" @click.stop />
-        <button class="image-preview-close" aria-label="关闭预览" @click="previewImg = null">✕</button>
-      </div>
+        :images="previewImg.images"
+        :index="previewImg.index"
+        @close="previewImg = null"
+        @update:index="(i: number) => previewImg && (previewImg.index = i)"
+      />
   </n-config-provider>
 </template>
 
@@ -639,35 +636,4 @@ onBeforeUnmount(() => {
 /* 侧边栏收起（替代原 聚焦/无干扰 模式） */
 .sidebar.collapsed { display: none; }
 /* 图片预览大图 */
-.image-preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: rgba(0, 0, 0, 0.78);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: zoom-out;
-}
-.image-preview-img {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: 4px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
-}
-.image-preview-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
-}
-.image-preview-close:hover { background: rgba(255, 255, 255, 0.3); }
 </style>
