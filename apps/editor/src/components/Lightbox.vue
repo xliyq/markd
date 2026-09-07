@@ -121,9 +121,20 @@ watch(() => props.index, resetTransform);
 /** 键盘：Esc 关闭、←/→ 切换 */
 function onKeydown(e: KeyboardEvent) {
   if (!visible.value) return;
-  if (e.key === "Escape") emit("close");
-  else if (e.key === "ArrowLeft" && props.index > 0) emit("update:index", props.index - 1);
-  else if (e.key === "ArrowRight" && props.index < props.images.length - 1) emit("update:index", props.index + 1);
+  // ⚠️ 必须 preventDefault + stopPropagation：否则 ←/→ 穿透到底层编辑器移动光标（焦点仍在 ProseMirror）
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    emit("close");
+  } else if (e.key === "ArrowLeft" && props.index > 0) {
+    e.preventDefault();
+    e.stopPropagation();
+    emit("update:index", props.index - 1);
+  } else if (e.key === "ArrowRight" && props.index < props.images.length - 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    emit("update:index", props.index + 1);
+  }
 }
 onMounted(() => window.addEventListener("keydown", onKeydown));
 onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
