@@ -97,6 +97,9 @@ export async function createEditor(
       // 图片上传策略注入（M4.2/核心：L2 返回 relPath 数组，core 构造 image node）
       if (options.uploader && uploadConfig) {
         const l2Uploader = options.uploader as (files: FileList | File[]) => Promise<string[]>
+        // ⚠️ 只覆盖 uploader 字段：官方 config 还含 uploadWidgetFactory（上传占位 widget）与
+        // enableHtmlFileUploader（HTML 粘贴文件提取）。整体 set 会抹掉它们 →
+        // 粘贴/拖拽图片时 uploadWidgetFactory is not a function 崩溃、图片插不进去。
         const adapter = {
           // 适配官方 uploader 契约：(files, schema, ctx, insertPos) => Promise<Node[]>
           uploader: async (files: FileList, schema: { nodes: Record<string, unknown> }): Promise<unknown[]> => {
@@ -115,7 +118,7 @@ export async function createEditor(
               .filter(Boolean)
           },
         }
-        ctx.set(uploadConfig.key, adapter as never)
+        ctx.set(uploadConfig.key, { ...ctx.get(uploadConfig.key), ...adapter } as never)
       }
     })
     // listener 插件始终注入（onChange 依赖它），避免重复注入（同实例幂等）
