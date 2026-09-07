@@ -9,7 +9,8 @@ import { upload } from '@milkdown/kit/plugin/upload'
 import { imageBlockComponent } from '@milkdown/components/image-block'
 import { imageUrlPaste } from './url-paste'
 import { $view, $ctx, $prose } from '@milkdown/utils'
-import { Plugin } from '@milkdown/prose/state'
+import { Plugin, NodeSelection } from '@milkdown/prose/state'
+import { editorViewCtx } from '@milkdown/kit/core'
 import { imageSchema } from '@milkdown/kit/preset/commonmark'
 import type { Node as PMNode } from '@milkdown/prose/model'
 import type { MilkdownPluginManifest } from '@editor/core'
@@ -39,6 +40,90 @@ export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
   retryBtn.className = 'image-retry-btn'
   retryBtn.textContent = '↻ 重试'
   dom.append(placeholder, img, retryBtn, handle)
+
+  // M4.3 属性编辑：选中时操作条 + 自绘浮层（alt/title 双输入）
+  const actions = document.createElement('div')
+  actions.className = 'image-actions'
+  const attrBtn = document.createElement('button')
+  attrBtn.type = 'button'
+  attrBtn.className = 'image-attr-btn'
+  attrBtn.title = '编辑图片属性（alt / title）'
+  attrBtn.textContent = '⚙ 属性'
+  actions.appendChild(attrBtn)
+  const viewBtn = document.createElement('button')
+  viewBtn.type = 'button'
+  viewBtn.className = 'image-view-btn'
+  viewBtn.title = '查看大图'
+  viewBtn.textContent = '🔍 大图'
+  actions.appendChild(viewBtn)
+  dom.appendChild(actions)
+
+  // 查看大图：派发自定义事件 → App 灯箱（单击保留给选中/属性，交互与官方一致）
+  viewBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    window.dispatchEvent(
+      new CustomEvent('milkdown:image-preview', { detail: { src: img.getAttribute('src') || '' } }),
+    )
+  })
+
+  const popover = document.createElement('div')
+  popover.className = 'image-attr-popover'
+  popover.innerHTML = `
+    <div class="image-attr-title">图片属性</div>
+    <label class="image-attr-row"><span>alt</span><input class="image-attr-alt" placeholder="替代文本（无障碍）" /></label>
+    <label class="image-attr-row"><span>title</span><input class="image-attr-title-input" placeholder="悬停标题" /></label>
+    <div class="image-attr-btns">
+      <button type="button" class="image-attr-cancel">取消</button>
+      <button type="button" class="image-attr-ok">确定</button>
+    </div>`
+  dom.appendChild(popover)
+
+  let attrOpen = false
+  function openAttr() {
+    const view = ctx.get(editorViewCtx)
+    const sel = view.state.selection
+    const node = sel instanceof NodeSelection && sel.node.type === initialNode.type ? sel.node : initialNode
+    const altInput = popover.querySelector('.image-attr-alt') as HTMLInputElement
+    const titleInput = popover.querySelector('.image-attr-title-input') as HTMLInputElement
+    altInput.value = (node.attrs.alt as string) ?? ''
+    titleInput.value = (node.attrs.title as string) ?? ''
+    popover.classList.add('show')
+    attrOpen = true
+    altInput.focus()
+  }
+  function closeAttr() {
+    popover.classList.remove('show')
+    attrOpen = false
+  }
+  function saveAttr() {
+    const view = ctx.get(editorViewCtx)
+    const sel = view.state.selection
+    const altInput = popover.querySelector('.image-attr-alt') as HTMLInputElement
+    const titleInput = popover.querySelector('.image-attr-title-input') as HTMLInputElement
+    if (sel instanceof NodeSelection && sel.node.type === initialNode.type) {
+      const attrs = {
+        ...sel.node.attrs,
+        alt: altInput.value,
+        title: titleInput.value,
+      }
+      view.dispatch(view.state.tr.setNodeMarkup(sel.$anchor.pos, null, attrs))
+    }
+    closeAttr()
+  }
+  attrBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    attrOpen ? closeAttr() : openAttr()
+  })
+  popover.querySelector('.image-attr-ok')!.addEventListener('click', (e) => { e.stopPropagation(); saveAttr() })
+  popover.querySelector('.image-attr-cancel')!.addEventListener('click', (e) => { e.stopPropagation(); closeAttr() })
+  const onDocMouseDown = (e: MouseEvent) => {
+    if (attrOpen && !dom.contains(e.target as Node)) closeAttr()
+  }
+  const onDocKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && attrOpen) closeAttr()
+  }
+  document.addEventListener('mousedown', onDocMouseDown)
+  document.addEventListener('keydown', onDocKeydown)
 
   const config = ctx.get(imageConfig.key)
   let currentSrc: string | null = null
@@ -110,7 +195,11 @@ export const imageNodeView = $view(imageSchema.node, (ctx) => (initialNode) => {
     },
     selectNode: () => dom.classList.add('selected'),
     deselectNode: () => dom.classList.remove('selected'),
-    destroy: () => dom.remove(),
+    destroy: () => {
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onDocKeydown)
+      dom.remove()
+    },
   }
 })
 

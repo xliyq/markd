@@ -91,15 +91,9 @@ export function useEditor() {
    * 打开时收集文档内全部图片（milkdown-image / image-block）→ 支持 ←/→ 切换。
    */
   const previewImg = ref<{ images: string[]; index: number } | null>(null);
-  async function onEditorClick(e: MouseEvent) {
-    const t = e.target as HTMLElement;
-    if (t.closest(".operation-item, input, .image-resize-handle, .image-retry-btn")) return;
-    const block = t.closest(".milkdown-image-block, .milkdown-image") as HTMLElement | null;
-    if (!block) return;
-    const img = block.querySelector("img");
-    const src = img?.getAttribute("src") || "";
+  /** 统一开灯箱：收集文档内全部图片 → 定位当前 src */
+  async function openLightbox(src: string) {
     if (!src) return;
-    // 收集文档内全部图片 src（已是 blob/远程可显示 URL）
     const all = Array.from(
       editorRoot.value?.querySelectorAll<HTMLElement>(".milkdown-image-block img, .milkdown-image img") ?? [],
     )
@@ -107,7 +101,6 @@ export function useEditor() {
       .filter(Boolean);
     let index = all.indexOf(src);
     if (index < 0) {
-      // 当前图不在列表（assets 解析差异）→ 单独解析并追加
       let url = src;
       if (src.startsWith("assets/")) {
         const imgMgr = (boot.value?.api as never as Record<string, unknown>).imageManager as
@@ -120,6 +113,23 @@ export function useEditor() {
       index = all.length - 1;
     }
     previewImg.value = { images: all, index };
+  }
+  /** 双击图片 → 灯箱（单击保留给选中/操作条；交互与官方一致） */
+  async function onEditorDblClick(e: MouseEvent) {
+    const t = e.target as HTMLElement;
+    const block = t.closest(".milkdown-image-block, .milkdown-image") as HTMLElement | null;
+    if (!block) return;
+    const img = block.querySelector("img");
+    await openLightbox(img?.getAttribute("src") || "");
+  }
+  /** NodeView 操作条「查看大图」按钮 → 自定义事件 → 灯箱 */
+  function installImagePreviewEvents() {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ src: string }>).detail;
+      if (detail?.src) void openLightbox(detail.src);
+    };
+    window.addEventListener("milkdown:image-preview", handler);
+    return () => window.removeEventListener("milkdown:image-preview", handler);
   }
 
   /** 打开文档：flush 源码 → 设当前 → 查名 → 挂载编辑器 → 手动刷大纲/字数 */
@@ -155,7 +165,8 @@ export function useEditor() {
     toggleSourceMode,
     flushSourceBeforeSwitch,
     rebuildEditor,
-    onEditorClick,
+    onEditorDblClick,
+    installImagePreviewEvents,
     openDoc,
   };
 }

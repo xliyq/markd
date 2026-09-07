@@ -34,7 +34,7 @@ const {
 /** 编辑器编排 */
 const {
   docTitle, outline, sidebarTab, statsText, lastMarkdown, sourceMode, sourceText, previewImg,
-  focusEditor, onToolbar, onDocChanged, toggleSourceMode, rebuildEditor, onEditorClick, openDoc,
+  focusEditor, onToolbar, onDocChanged, toggleSourceMode, rebuildEditor, onEditorDblClick, installImagePreviewEvents, openDoc,
 } = useEditor();
 
 /** 弹窗桥（prompt/link/image） */
@@ -222,6 +222,7 @@ onMounted(async () => {
     await boot.value.mountEditor(editorRoot.value, md);
     onDocChanged(md);
     await loadEditorPrefs();
+    installImagePreviewEvents();
     statusText.value = "编辑器已就绪";
   }
 });
@@ -434,7 +435,7 @@ onBeforeUnmount(() => {
         <main class="main" :class="{ 'source-mode': sourceMode }" role="main" aria-label="编辑区">
           <!-- 顶部编辑工具栏（替代依赖 slash/tooltip 才发现功能） -->
           <EditorToolbar :source-mode="sourceMode" @toolbar="onToolbar" @toggle-source="toggleSourceMode" />
-          <div ref="editorRoot" v-show="!sourceMode" class="editor-root" @click="onEditorClick"></div>
+          <div ref="editorRoot" v-show="!sourceMode" class="editor-root" @dblclick="onEditorDblClick"></div>
           <textarea
             v-show="sourceMode"
             v-model="sourceText"
