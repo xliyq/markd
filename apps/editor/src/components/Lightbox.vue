@@ -118,26 +118,25 @@ function onOpenNew() {
 /** 切换图片时还原缩放 */
 watch(() => props.index, resetTransform);
 
-/** 键盘：Esc 关闭、←/→ 切换 */
+/**
+ * 键盘：Esc 关闭、←/→ 切换。
+ * ⚠️ 必须用**捕获阶段**（capture:true）拦截：ProseMirror 在目标阶段就处理按键，
+ * 冒泡阶段 preventDefault 太晚（光标已被移动）。灯箱打开 = 模态：底层编辑器一切键盘输入都不响应。
+ */
 function onKeydown(e: KeyboardEvent) {
   if (!visible.value) return;
-  // ⚠️ 必须 preventDefault + stopPropagation：否则 ←/→ 穿透到底层编辑器移动光标（焦点仍在 ProseMirror）
+  e.preventDefault();
+  e.stopPropagation();
   if (e.key === "Escape") {
-    e.preventDefault();
-    e.stopPropagation();
     emit("close");
   } else if (e.key === "ArrowLeft" && props.index > 0) {
-    e.preventDefault();
-    e.stopPropagation();
     emit("update:index", props.index - 1);
   } else if (e.key === "ArrowRight" && props.index < props.images.length - 1) {
-    e.preventDefault();
-    e.stopPropagation();
     emit("update:index", props.index + 1);
   }
 }
-onMounted(() => window.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onMounted(() => window.addEventListener("keydown", onKeydown, { capture: true }));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, { capture: true }));
 </script>
 
 <style scoped>
